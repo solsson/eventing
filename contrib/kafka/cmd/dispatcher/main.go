@@ -17,74 +17,34 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
-	provisionerController "github.com/knative/eventing/contrib/kafka/pkg/controller"
 	"github.com/knative/eventing/contrib/kafka/pkg/dispatcher"
-	"github.com/knative/eventing/pkg/sidecar/configmap/watcher"
-	"github.com/knative/eventing/pkg/system"
 )
 
 func main() {
 
-	configMapName := os.Getenv("DISPATCHER_CONFIGMAP_NAME")
-	if configMapName == "" {
-		configMapName = provisionerController.DispatcherConfigMapName
-	}
-	configMapNamespace := os.Getenv("DISPATCHER_CONFIGMAP_NAMESPACE")
-	if configMapNamespace == "" {
-		configMapNamespace = system.Namespace
-	}
+	brokers := []string{"localhost:9094"}
 
-	logger, err := zap.NewProduction()
+	logger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("unable to create logger: %v", err)
 	}
 
-	provisionerConfig, err := provisionerController.GetProvisionerConfig("/etc/config-provisioner")
-	if err != nil {
-		logger.Fatal("unable to load provisioner config", zap.Error(err))
-	}
-
-	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{})
-	if err != nil {
-		logger.Fatal("unable to create manager.", zap.Error(err))
-	}
-
-	kafkaDispatcher, err := dispatcher.NewDispatcher(provisionerConfig.Brokers, logger)
+	kafkaDispatcher, err := dispatcher.NewDispatcher(brokers, logger)
 	if err != nil {
 		logger.Fatal("unable to create kafka dispatcher.", zap.Error(err))
 	}
-
-	kc, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		logger.Fatal("unable to create kubernetes client.", zap.Error(err))
-	}
-
-	cmw, err := watcher.NewWatcher(logger, kc, configMapNamespace, configMapName, kafkaDispatcher.UpdateConfig)
-	if err != nil {
-		logger.Fatal("unable to create configmap watcher", zap.String("configmap", fmt.Sprintf("%s/%s", configMapNamespace, configMapName)))
-	}
-	mgr.Add(cmw)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
 	// Start both the manager (which notices ConfigMap changes) and the HTTP server.
 	var g errgroup.Group
-	g.Go(func() error {
-		// Start blocks forever, so run it in a goroutine.
-		return mgr.Start(stopCh)
-	})
 
 	g.Go(func() error {
 		// Setups message receiver and blocks
