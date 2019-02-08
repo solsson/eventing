@@ -269,6 +269,8 @@ func fromKafkaMessage(kafkaMessage *sarama.ConsumerMessage) *provisioners.Messag
 	for _, header := range kafkaMessage.Headers {
 		headers[string(header.Key)] = string(header.Value)
 	}
+	// TODO can we have some heuristics for content type unless there's such a header?
+	headers["Content-Type"] = "application/octet-stream"
 	message := provisioners.Message{
 		Headers: headers,
 		Payload: kafkaMessage.Value,
