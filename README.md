@@ -1,3 +1,52 @@
+
+# Kafka dispatcher
+
+Standalone kafka<->REST bridge based on Knative Eventing source.
+
+To run the PoC you currently need:
+
+ * Kafka bootstrap on localhost:9094
+ * kafkacat
+ * node.js
+ * go with with this source cloned to $GOPATH/src/github.com/knative/eventing
+
+Start the dispatcher using this fork's patched main:
+
+```
+cd contrib/kafka/cmd/dispatcher
+go build && ./dispatcher
+```
+
+Start the test service that logs requests:
+
+```
+cd kafka-dispatcher-testserver/
+npm install --ignore-scripts
+node ./index.js | bunyan
+```
+
+Produce an event (watch testserver's logs for the result):
+
+```
+echo '{"json":true}' | kafkacat -b localhost:9094 -P -t knative-eventing-channel.dummyns1.dummyservice-trigger
+```
+
+The service can also be used to produce to kafka through REST:
+
+```
+curl --data "{\"date\":\"$(date)\"}" -H 'Host: dummyservice.dummyns1.whatever' -v http://localhost:8080/
+kafkacat -b localhost:9094 -C -t knative-eventing-channel.dummyns1.dummyservice
+```
+
+Make sure we can docker build the same main, for use as a sidecar:
+
+```
+docker build -t kafka-dispatcher-standalone .
+```
+
+Next step would be to investigate what kind of guarantees we can get.
+See https://github.com/Yolean/kafka-transform-nodejs-runtime.
+
 # Knative Eventing
 
 [![GoDoc](https://godoc.org/github.com/knative/eventing?status.svg)](https://godoc.org/github.com/knative/eventing)

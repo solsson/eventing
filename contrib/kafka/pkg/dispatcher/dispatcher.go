@@ -156,6 +156,9 @@ func (d *KafkaDispatcher) Start(stopCh <-chan struct{}) error {
 		}
 	}()
 
+	// TODO expose some API or configuration point to set up subscriptions at start, in for example a sidecar
+	d.Subscribe()
+
 	return d.receiver.Start(stopCh)
 }
 
@@ -179,6 +182,8 @@ func (d *KafkaDispatcher) subscribe(channelRef provisioners.ChannelReference, su
 		d.kafkaConsumers[channelRef] = channelMap
 	}
 	channelMap[sub] = consumer
+
+	d.logger.Info("Subscribed", zap.String("topic", topicName))
 
 	go func() {
 		for {
@@ -292,4 +297,19 @@ func newSubscription(spec eventingduck.ChannelSubscriberSpec) subscription {
 		SubscriberURI: spec.SubscriberURI,
 		ReplyURI:      spec.ReplyURI,
 	}
+}
+
+// Subscribe allows API level setup
+func (d *KafkaDispatcher) Subscribe() error {
+	channelRef := provisioners.ChannelReference{
+		Name:      "dummyservice-trigger",
+		Namespace: "dummyns1",
+	}
+	sub := subscription{
+		Name:          "dummyservice-trigger",
+		Namespace:     "dummyns1",
+		SubscriberURI: "http://localhost:8081/sub",
+		ReplyURI:      "http://localhost:8081/reply",
+	}
+	return d.subscribe(channelRef, sub)
 }
