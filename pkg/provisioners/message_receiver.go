@@ -68,7 +68,7 @@ func (r *MessageReceiver) Start(stopCh <-chan struct{}) error {
 }
 
 func (r *MessageReceiver) start() *http.Server {
-	r.logger.Info("Starting web server")
+	r.logger.Info("Starting web server", zap.Int("port", MessageReceiverPort))
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", MessageReceiverPort),
 		Handler: r.handler(),
